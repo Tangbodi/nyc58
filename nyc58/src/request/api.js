@@ -40,7 +40,7 @@ const handleResponse = async (response) => {
 /**
  * Internal helper for POST requests.
  * @param {string} path
- * @param {RegistrationAPIReq} body
+ * @param {any} body
  * @returns {Promise<any>}
  */
 const post = (path, body) => {
@@ -65,4 +65,13 @@ export const registrationAPI = (params) => {
   };
 
   return post('/api/v1/user/registration', payload);
+};
+
+/**
+ * login
+ * @param {LoginAPIReq} params
+ * @returns {Promise<APIRes<LoginAPIRes>>}
+ */
+export const loginAPI = (params) => {
+  return post('/api/v1/user/login', params);
 };

@@ -1,13 +1,16 @@
 import http from 'http';
 import { URL } from 'url';
-import crypto from 'crypto';
+import { createAuthHandlers } from './handlers/auth.js';
 import pool from '../database/db.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
-const setCommonHeaders = (res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+const setCommonHeaders = (req, res) => {
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 };
@@ -49,35 +52,6 @@ const parseJSONBody = (req) =>
     req.on('error', (err) => reject(err));
   });
 
-const hashPassword = (value) => {
-  return crypto.createHash('sha256').update(value).digest('hex');
-};
-
-const validateRegistrationPayload = ({ username, email, phone, password, confirmPassword }) => {
-  if (!username || !phone || !email || !password || !confirmPassword) {
-    return 'All fields are required';
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return 'Invalid email address';
-  }
-
-  if (phone && !/^[0-9()+\-\s]{7,20}$/.test(phone)) {
-    return 'Invalid phone number';
-  }
-
-  if (password !== confirmPassword) {
-    return 'Passwords do not match';
-  }
-
-  if (password.length < 6) {
-    return 'Password must be at least 6 characters long';
-  }
-
-  return null;
-};
-
 const handleHealthCheck = async (_req, res) => {
   try {
     const connection = await pool.getConnection();
@@ -89,66 +63,23 @@ const handleHealthCheck = async (_req, res) => {
   }
 };
 
-const handleRegistration = async (req, res) => {
-  let payload;
-  try {
-    payload = await parseJSONBody(req);
-  } catch (err) {
-    sendJSON(res, 400, { success: false, message: err.message });
-    return;
-  }
+const sessionStore = new Map();
 
-  const validationMessage = validateRegistrationPayload(payload);
-  if (validationMessage) {
-    sendJSON(res, 400, { success: false, message: validationMessage });
-    return;
-  }
-
-  const { username, email, phone, password } = payload;
-  const sanitizedPhone =
-    typeof phone === 'string' ? phone.trim() : null;
-  const normalizedPhone = sanitizedPhone && sanitizedPhone.length > 0 ? sanitizedPhone : null;
-
-  try {
-    const [existing] = await pool.execute(
-      'SELECT user_id FROM users WHERE email = ? OR username = ? LIMIT 1',
-      [email, username]
-    );
-
-    if (existing.length > 0) {
-      sendJSON(res, 409, { success: false, message: 'User already exists' });
-      return;
-    }
-
-    const passwordHash = hashPassword(password);
-    const [result] = await pool.execute(
-      'INSERT INTO users (username, password, phone, email ) VALUES (?, ?, ?, ?)',
-      [username, passwordHash, normalizedPhone, email]
-    );
-
-    sendJSON(res, 201, {
-      success: true,
-      message: 'Registration successful',
-      data: {
-        userId: result.insertId,
-        username,
-        email,
-        phone: normalizedPhone,
-        createdAt: new Date().toISOString()
-      }
-    });
-  } catch (err) {
-    console.error('Registration failed:', err);
-    sendJSON(res, 500, { success: false, message: 'Failed to register user' });
-  }
-};
+const { handleRegistration, handleLogin, handleGetUserInfo } = createAuthHandlers({
+  parseJSONBody,
+  sendJSON,
+  pool,
+  sessionStore
+});
 
 const router = new Map();
 router.set('GET /health', handleHealthCheck);
 router.set('POST /api/v1/user/registration', handleRegistration);
+router.set('POST /api/v1/user/login', handleLogin);
+router.set('GET /api/v1/user-info', handleGetUserInfo);
 
 const server = http.createServer(async (req, res) => {
-  setCommonHeaders(res);
+  setCommonHeaders(req, res);
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);

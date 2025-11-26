@@ -19,6 +19,20 @@
  * @property {string} message
  * @property {T} data
  */
+
+/**
+ * @typedef {Object} LoginAPIReq
+ * @property {string} email
+ * @property {string} password
+ */
+
+/**
+ * @typedef {Object} LoginAPIRes
+ * @property {string} userId
+ * @property {string} username
+ * @property {string} email
+ * @property {string | null} phone
+ */
 /**
  * Immutable template used to seed a registration payload.
  * Always clone (`{ ...registrationRequest, ...formState }`) before mutation.
