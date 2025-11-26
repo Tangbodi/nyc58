@@ -54,7 +54,7 @@ const hashPassword = (value) => {
 };
 
 const validateRegistrationPayload = ({ username, email, phone, password, confirmPassword }) => {
-  if (!username || !email || !password || !confirmPassword) {
+  if (!username || !phone || !email || !password || !confirmPassword) {
     return 'All fields are required';
   }
 

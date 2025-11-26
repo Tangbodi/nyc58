@@ -29,3 +29,11 @@ export const registrationRequest = Object.freeze({
   password: '',
   confirmPassword: ''
 });
+
+/**
+ * Get user info
+ * @returns {Promise<APIRes>}
+ */
+export const getUserInfoAPI = () => {
+  return request.get('/api/v1/user-info/');
+};
